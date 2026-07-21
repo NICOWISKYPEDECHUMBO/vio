@@ -116,7 +116,7 @@
     position:absolute;inset:0;border:3px solid var(--ink);border-radius:6px;
     overflow:hidden;backface-visibility:hidden;background:#fff;
   }
-  /* FOTO PREENCHE TODO O ESPAÇO (cover, sem sobra) */
+  /* FOTO PREENCHE TODO O ESPAÇO */
   .obj3d .f img{width:100%;height:100%;object-fit:cover;background:#fff;display:block}
   .obj3d .front{transform:translateZ(14px)}
   .obj3d .back{transform:rotateY(180deg) translateZ(14px)}
@@ -134,11 +134,6 @@
   }
   .obj3d .cT{transform:rotateX(90deg) translateZ(48px)}
   .obj3d .cB{transform:rotateX(-90deg) translateZ(48px)}
-  /* alvo de clique maior e mais à frente = toque confiável no celular */
-  .obj3d .hit{
-    position:absolute;inset:-14px;transform:translateZ(62px);
-    background:rgba(0,0,0,0);cursor:pointer;
-  }
   .obj3d .sombra{
     position:absolute;left:-8px;right:-8px;bottom:-14px;height:16px;
     background:radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,.5), transparent 70%);
@@ -524,7 +519,7 @@
     <button class="walkbtn" id="btnRight" title="Andar para a direita">▶</button>
   </div>
 </div>
-<div id="hint-keys"><b>W/S</b> anda · <b>Q/E</b> de lado · <b>A/D</b> gira (ou arraste) · <b>+/−, roda, pinça</b> = zoom · clique no objeto: o boneco sobe na escada, pega na mão e quebra no chão!</div>
+<div id="hint-keys"><b>W/S</b> anda · <b>Q/E</b> de lado · <b>A/D</b> gira (ou arraste) · <b>+/−, roda, pinça</b> = zoom · toque no objeto: escada, pega na mão e POW no chão!</div>
 
 <div id="toast"></div>
 <div id="fx"></div>
@@ -534,9 +529,11 @@
 'use strict';
 /* ================================================================
    ARQUIVO POW! — Sala de Metas 3D
-   · clique no objeto: escada -> boneco PEGA o objeto na mão ->
-     desce -> arremessa -> vidro espatifando + poeira + carimbo
-   · foto preenche TODO o objeto (cover), em qualquer tamanho
+   · TOQUE PRÓPRIO: o app detecta o toque pela posição na tela
+     (getBoundingClientRect), sem depender do clique nativo em
+     elemento 3D — que falha no celular. Agora SEMPRE funciona.
+   · clique no objeto: escada -> pega na mão -> quebra c/ vidro+poeira
+   · foto preenche todo o objeto (cover)
    Dados: localStorage 'guardador.de.links.v1'
    ================================================================ */
 
@@ -695,7 +692,7 @@ function buildScene(){
           const slot=el('div','photo-slot','+ subir<br>foto');
           slot.style.left = colsX[item.colStart]+'px';
           slot.style.top = (rowsY[r]-100)+'px';
-          slot.onclick = e => { e.stopPropagation(); if(dragMoved) return; startUpload(M.shelf.id); };
+          slot._tap = ()=>startUpload(M.shelf.id);      /* toque próprio */
           shelf.appendChild(slot);
         } else {
           const t=item.t;
@@ -705,13 +702,12 @@ function buildScene(){
           tr.style.top = (rowsY[r]-100)+'px';
           tr.dataset.row = r;
           tr.dataset.mod = u;
-          tr.onclick = e => { e.stopPropagation(); if(dragMoved) return; tryThrow(t, u, r); };
+          tr._tap = ()=>tryThrow(t, u, r);              /* toque próprio */
           shelf.appendChild(tr);
         }
       });
     });
 
-    shelf.onclick = ()=>{ if(!dragMoved) openMenu(); };
     track(shelf, P.cx, P.cz);
     world.appendChild(shelf);
 
@@ -751,7 +747,7 @@ function buildScene(){
         const tag=el('div','donetag','CONCLUÍDO');
         tag.style.cssText += `left:${pw/2-56}px;top:${ph-30}px;`;
         pile.appendChild(tag);
-        pile.onclick=()=>{ if(dragMoved) return; askYes('Limpar os cacos desta meta concluída?', ()=>{ S.data.trophies=S.data.trophies.filter(x=>x.id!==t.id); save(); buildScene(); renderHUD(); }); };
+        pile._tap=()=>askYes('Limpar os cacos desta meta concluída?', ()=>{ S.data.trophies=S.data.trophies.filter(x=>x.id!==t.id); save(); buildScene(); renderHUD(); });
         track(pile, px, pz);
         world.appendChild(pile);
       });
@@ -791,13 +787,44 @@ function buildObject3D(t, width){
   spin.style.animationDelay = (-(Math.abs(hashCode(t.id))%12))+'s';
   tr.appendChild(el('div','sombra'));
   tr.appendChild(spin);
-  tr.appendChild(el('div','hit'));
   return tr;
 }
 function hashCode(s){ let h=0; for(const c of s) h=(h*31 + c.charCodeAt(0))|0; return h; }
 function mulberry(seedStr){
   let h=1779033703; for(const ch of String(seedStr)) h=Math.imul(h^ch.charCodeAt(0),3432918353);
   return function(){ h=Math.imul(h^(h>>>16),2246822507); h=Math.imul(h^(h>>>13),3266489909); return ((h^=h>>>16)>>>0)/4294967296; };
+}
+
+/* ================================================================
+   TOQUE PRÓPRIO — detecta o que foi tocado pela posição na tela,
+   sem depender do clique nativo em elementos 3D (que falha)
+   ================================================================ */
+function tapPick(x, y){
+  const PAD = 14;                                   // tolerância do dedo
+  const cands=[];
+  document.querySelectorAll('.obj3d, .photo-slot, .pile-face').forEach(n=>{
+    if(!n._tap) return;
+    if(getComputedStyle(n).visibility==='hidden') return;
+    const r=n.getBoundingClientRect();
+    if(r.width<4 || r.height<4) return;
+    if(x>=r.left-PAD && x<=r.right+PAD && y>=r.top-PAD && y<=r.bottom+PAD){
+      const dc=Math.abs(x-(r.left+r.right)/2)+Math.abs(y-(r.top+r.bottom)/2);
+      cands.push({n, area:r.width*r.height, dc});
+    }
+  });
+  if(cands.length){
+    cands.sort((a,b)=> (a.area-b.area) || (a.dc-b.dc));  // menor alvo vence
+    cands[0].n._tap();
+    return true;
+  }
+  /* tocou no fundo de uma prateleira -> abre o menu */
+  const shelves=document.querySelectorAll('.shelf-face');
+  for(const n of shelves){
+    if(getComputedStyle(n).visibility==='hidden') continue;
+    const r=n.getBoundingClientRect();
+    if(x>=r.left && x<=r.right && y>=r.top && y<=r.bottom){ openMenu(); return true; }
+  }
+  return false;
 }
 
 /* ---------- câmera ---------- */
@@ -923,7 +950,7 @@ holdBtn(document.getElementById('btnRotR'), ()=>{ if(S.rotDir===1) S.rotDir=0; }
 holdBtn(document.getElementById('btnZoomIn'),  ()=>{ if(S.zoomDir===1) S.zoomDir=0; }, ()=>S.zoomDir=1);
 holdBtn(document.getElementById('btnZoomOut'), ()=>{ if(S.zoomDir===-1) S.zoomDir=0; }, ()=>S.zoomDir=-1);
 
-/* arrastar p/ girar · pinça p/ zoom · toque duplo p/ aproximar */
+/* arrastar p/ girar · pinça p/ zoom · toque = interagir · toque duplo no vazio = aproximar */
 let dragMoved=false;
 (function(){
   const vp=document.getElementById('viewport');
@@ -948,7 +975,7 @@ let dragMoved=false;
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
     if(pts.size===1){
       const dx=e.clientX-lastX; lastX=e.clientX;
-      if(Math.abs(e.clientX-startX)+Math.abs(e.clientY-startY) > 9) dragMoved=true;
+      if(Math.abs(e.clientX-startX)+Math.abs(e.clientY-startY) > 11) dragMoved=true;
       if(dragMoved && dx!==0) S.yaw += dx*0.22;
     } else if(pts.size===2){
       const a=[...pts.values()];
@@ -975,8 +1002,11 @@ let dragMoved=false;
     dolly(-e.deltaY*0.7);
   }, {passive:false});
 
+  /* TOQUE: primeiro tenta interagir com o que está sob o dedo;
+     se não tiver nada, toque duplo aproxima */
   vp.addEventListener('pointerup', e=>{
-    if(S.view!=='walk' || dragMoved) return;
+    if(S.view!=='walk' || dragMoved || S.throwing) return;
+    if(tapPick(e.clientX, e.clientY)){ lastTap=0; return; }
     const now=Date.now();
     if(now-lastTap<320){ dolly(240); lastTap=0; }
     else lastTap=now;
@@ -1071,14 +1101,14 @@ function tryThrow(t, modU, row){
   grabAndSmash(t, needsLadder);
 }
 
-/* posição da mão do boneco na tela (funciona subido na escada ou no chão) */
+/* posição da mão do boneco na tela */
 function handPos(){
   const r=hero.getBoundingClientRect();
   return { x:r.left + r.width*0.62, y:r.top + r.height*0.30 };
 }
 
-/* sequência completa: (escada) -> voa da prateleira p/ a MÃO ->
-   segura -> desce -> arremesso -> QUEBRA com vidro + poeira */
+/* sequência: (escada) -> voa da prateleira p/ a MÃO -> segura ->
+   desce -> arremesso -> QUEBRA com vidro + poeira + carimbo */
 function grabAndSmash(t, needsLadder){
   if(S.throwing) return;
   S.throwing = true;
@@ -1149,7 +1179,7 @@ function grabAndSmash(t, needsLadder){
       };
 
       if(needsLadder){
-        hero.classList.remove('climb');                 // desce (transição .5s)
+        hero.classList.remove('climb');                 // desce
         fly.style.transition='left 90ms linear, top 90ms linear';
         const follow=setInterval(()=>{                  // objeto acompanha a mão
           const p=handPos();

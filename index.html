@@ -116,7 +116,8 @@
     position:absolute;inset:0;border:3px solid var(--ink);border-radius:6px;
     overflow:hidden;backface-visibility:hidden;background:#fff;
   }
-  .obj3d .f img{width:100%;height:100%;object-fit:contain;background:#fff;display:block}
+  /* FOTO PREENCHE TODO O ESPAÇO (cover, sem sobra) */
+  .obj3d .f img{width:100%;height:100%;object-fit:cover;background:#fff;display:block}
   .obj3d .front{transform:translateZ(14px)}
   .obj3d .back{transform:rotateY(180deg) translateZ(14px)}
   .obj3d .edge{
@@ -133,9 +134,9 @@
   }
   .obj3d .cT{transform:rotateX(90deg) translateZ(48px)}
   .obj3d .cB{transform:rotateX(-90deg) translateZ(48px)}
-  /* alvo de clique fixo na frente do objeto (o bloco gira; isso aqui não) */
+  /* alvo de clique maior e mais à frente = toque confiável no celular */
   .obj3d .hit{
-    position:absolute;inset:-8px;transform:translateZ(52px);
+    position:absolute;inset:-14px;transform:translateZ(62px);
     background:rgba(0,0,0,0);cursor:pointer;
   }
   .obj3d .sombra{
@@ -147,7 +148,7 @@
   /* ============ objeto 3D: MOLDE (recorte extrudado) ============ */
   .obj3d.molde .layer{
     position:absolute;inset:0;
-    background-size:contain;background-position:center;background-repeat:no-repeat;
+    background-size:cover;background-position:center;background-repeat:no-repeat;
     background-color:#efe8d6;
     border:2.5px solid var(--ink);
     border-radius:46% 54% 48% 52% / 62% 58% 40% 44%;
@@ -214,6 +215,9 @@
   #hero .armL,#hero .armR{transform-origin:50% 8%}
   #hero.walking .armL{animation:armL .46s ease-in-out infinite}
   #hero.walking .armR{animation:armR .46s ease-in-out infinite}
+  /* braços erguidos segurando o objeto */
+  #hero.holding .armR{animation:none;transform:rotate(-135deg);transition:transform .25s ease}
+  #hero.holding .armL{animation:none;transform:rotate(135deg);transition:transform .25s ease}
   #hero.throwing .armR{animation:throwArmR .6s ease}
   #hero.throwing .armL{animation:throwArmL .6s ease}
 
@@ -393,7 +397,7 @@
     width:150px;height:170px;border:3px solid var(--ink);border-radius:10px;overflow:hidden;
     background:#fff;box-shadow:4px 4px 0 rgba(0,0,0,.3);flex:none;
   }
-  .up-preview img{width:100%;height:100%;object-fit:contain}
+  .up-preview img{width:100%;height:100%;object-fit:cover}
   .up-fields{flex:1;min-width:230px;display:flex;flex-direction:column;gap:10px}
   .up-fields label{font-weight:800;font-size:13px}
   .up-fields input[type=text], .up-fields select{
@@ -415,10 +419,10 @@
   #fx{position:fixed;inset:0;z-index:55;pointer-events:none}
   .flying-photo{
     position:fixed;border:4px solid var(--ink);border-radius:8px;background:#fff;overflow:hidden;
-    box-shadow:6px 8px 0 rgba(0,0,0,.4);will-change:transform;
+    box-shadow:6px 8px 0 rgba(0,0,0,.4);will-change:transform;z-index:56;
   }
   .flying-photo.molde{border-radius:46% 54% 48% 52% / 62% 58% 40% 44%}
-  .flying-photo img{width:100%;height:100%;object-fit:contain;display:block}
+  .flying-photo img{width:100%;height:100%;object-fit:cover;display:block}
   .fx-shard{
     position:fixed;width:22px;height:26px;will-change:transform,opacity;
     background:linear-gradient(135deg,rgba(220,242,252,.98),rgba(150,195,215,.85));
@@ -520,7 +524,7 @@
     <button class="walkbtn" id="btnRight" title="Andar para a direita">▶</button>
   </div>
 </div>
-<div id="hint-keys"><b>W/S</b> anda · <b>Q/E</b> de lado · <b>A/D</b> gira (ou arraste) · <b>+/−, roda, pinça</b> = zoom · clique no objeto: o boneco pega (escada se estiver no alto!) e joga no chão</div>
+<div id="hint-keys"><b>W/S</b> anda · <b>Q/E</b> de lado · <b>A/D</b> gira (ou arraste) · <b>+/−, roda, pinça</b> = zoom · clique no objeto: o boneco sobe na escada, pega na mão e quebra no chão!</div>
 
 <div id="toast"></div>
 <div id="fx"></div>
@@ -529,11 +533,10 @@
 <script>
 'use strict';
 /* ================================================================
-   ARQUIVO POW! — Sala de Metas 3D (versão consertada)
-   · clique confiável (zera dedos vazados da pinça)
-   · zoom máximo: anda até a parede + lente até 3x (botões +/−)
-   · tamanho do objeto: 1 espaço, 2 espaços ou prateleira toda
-   · foto inteira, sem corte · escada · poeira · sem popups nativos
+   ARQUIVO POW! — Sala de Metas 3D
+   · clique no objeto: escada -> boneco PEGA o objeto na mão ->
+     desce -> arremessa -> vidro espatifando + poeira + carimbo
+   · foto preenche TODO o objeto (cover), em qualquer tamanho
    Dados: localStorage 'guardador.de.links.v1'
    ================================================================ */
 
@@ -590,8 +593,7 @@ const brokenIn = sid => S.data.trophies.filter(t=> t.broken && t.shelfId===sid);
 const aliveAll = () => S.data.trophies.filter(t=>!t.broken);
 const brokenAll= () => S.data.trophies.filter(t=> t.broken);
 
-/* ---------- empacota os objetos do tema em linhas de 3 espaços ----------
-   cada objeto ocupa t.size espaços (1, 2 ou 3); +1 espaço p/ o slot de foto */
+/* ---------- empacota os objetos em linhas de 3 espaços ---------- */
 function packShelf(sid){
   const rows=[];
   let cur=[], used=0;
@@ -685,7 +687,6 @@ function buildScene(){
       const b2=el('div','bracket'); b2.style.cssText+=`right:34px;top:${y+10}px;`; shelf.appendChild(b2);
     });
 
-    /* linhas deste módulo (empacotadas por tamanho) */
     const modRows = M.rows.slice(M.part*3, M.part*3+3);
     modRows.forEach((rowItems, r)=>{
       rowItems.forEach(item=>{
@@ -784,7 +785,6 @@ function buildObject3D(t, width){
       '<div class="edge eL"></div><div class="edge eR"></div>'+
       '<div class="cap cT"></div><div class="cap cB"></div>';
     spin.querySelectorAll('img').forEach(im=>im.src=t.image);
-    /* laterais na largura real do objeto (1x, 2x ou prateleira toda) */
     spin.querySelector('.eL').style.transform='rotateY(-90deg) translateZ('+(width/2)+'px)';
     spin.querySelector('.eR').style.transform='rotateY(90deg) translateZ('+(width/2)+'px)';
   }
@@ -856,13 +856,12 @@ function tick(t){
   S.cx = Math.max(-lim, Math.min(lim, S.cx));
   S.cz = Math.max(-lim, Math.min(lim, S.cz));
   updateWorld();
-  hero.classList.toggle('walking', moving);
+  hero.classList.toggle('walking', moving && !S.throwing);
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
 
-/* zoom híbrido: avança na direção do olhar; ao encostar na parede,
-   vira zoom de lente (amplia a imagem até 3x). Recuar desfaz a lente antes. */
+/* zoom híbrido */
 function zoomBy(amount){
   if(amount<0 && S.zoom>1){
     S.zoom = Math.max(1, S.zoom + amount*0.004);
@@ -933,9 +932,6 @@ let dragMoved=false;
 
   vp.addEventListener('pointerdown', e=>{
     if(S.view!=='walk') return;
-    /* dedo primário novo = gesto novo: limpa ponteiros que vazaram
-       (navegadores engolem o pointerup de um dedo da pinça às vezes,
-        e aí todo toque virava "pinça" e nenhum clique passava) */
     if(e.isPrimary) pts.clear();
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
     if(pts.size===1){
@@ -1016,7 +1012,7 @@ function addShelfAsk(cb){
 }
 
 /* ================================================================
-   ARREMESSO (com escada e poeira)
+   PEGAR NA MÃO + ARREMESSO (escada, poeira e vidro)
    ================================================================ */
 function toast(msg){
   const t=document.getElementById('toast');
@@ -1024,8 +1020,6 @@ function toast(msg){
   clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.display='none'; }, 1700);
 }
 
-/* diálogos próprios — confirm()/prompt() nativos são bloqueados em vários
-   navegadores de celular, então nada aqui depende deles */
 function askYes(msg, onYes){
   const veil=el('div','overlay-veil'); veil.style.zIndex='90';
   const panel=el('div','panel'); panel.style.width='min(420px,94vw)';
@@ -1073,112 +1067,153 @@ function tryThrow(t, modU, row){
     const d=Math.hypot(m.cx-S.cx, m.cz-S.cz);
     if(d>NEAR){ toast('Chegue mais perto da prateleira!'); return; }
   }
-  const needsLadder = row!==undefined && row<2;
-  if(needsLadder) ladderThen(t);
-  else throwCore(t);
+  const needsLadder = row!==undefined && row<2;   // prateleiras de cima e do meio
+  grabAndSmash(t, needsLadder);
 }
 
-function ladderThen(t){
-  S.throwing = true;
-  const fx=document.getElementById('fx');
-  const trEl = document.querySelector('.obj3d[data-tid="'+t.id+'"]');
-  const rect = trEl ? trEl.getBoundingClientRect() : {left:innerWidth*.5, width:90};
-
-  const lad = el('div','fx-ladder');
-  lad.innerHTML='<div class="rail l"></div><div class="rail r"></div><div class="rungs"></div>';
-  lad.style.left = Math.max(8, Math.min(innerWidth-100, rect.left + rect.width/2 - 46))+'px';
-  fx.appendChild(lad);
-  requestAnimationFrame(()=>{ lad.style.bottom='0'; });
-
-  setTimeout(()=>{ hero.classList.add('climb'); }, 320);
-  setTimeout(()=>{
-    S.throwing=false;
-    throwCore(t, ()=>{
-      hero.classList.remove('climb');
-      setTimeout(()=>{ lad.style.bottom='-64vh'; lad.style.opacity='0'; }, 380);
-      setTimeout(()=>lad.remove(), 900);
-    });
-  }, 900);
+/* posição da mão do boneco na tela (funciona subido na escada ou no chão) */
+function handPos(){
+  const r=hero.getBoundingClientRect();
+  return { x:r.left + r.width*0.62, y:r.top + r.height*0.30 };
 }
 
-function throwCore(t, afterFn){
+/* sequência completa: (escada) -> voa da prateleira p/ a MÃO ->
+   segura -> desce -> arremesso -> QUEBRA com vidro + poeira */
+function grabAndSmash(t, needsLadder){
   if(S.throwing) return;
   S.throwing = true;
-
-  let startRect = null;
-  const trEl = document.querySelector('.obj3d[data-tid="'+t.id+'"]');
-  if(trEl) startRect = trEl.getBoundingClientRect();
-  const vw=innerWidth, vh=innerHeight;
-  if(!startRect || startRect.width<4) startRect = { left:vw*.6, top:vh*.3, width:90, height:100 };
+  S.walkDir=0; S.strafeDir=0; S.rotDir=0;
+  hero.classList.remove('walking');
 
   const fx=document.getElementById('fx');
+  const vw=innerWidth, vh=innerHeight;
+  const trEl = document.querySelector('.obj3d[data-tid="'+t.id+'"]');
+  let rect = trEl ? trEl.getBoundingClientRect() : null;
+  if(!rect || rect.width<4) rect = { left:vw*.6, top:vh*.3, width:90, height:100 };
 
-  hero.classList.remove('throwing'); void hero.offsetWidth;
-  hero.classList.add('throwing');
-  setTimeout(()=>hero.classList.remove('throwing'), 650);
+  /* 1) escada (se o objeto estiver no alto) */
+  let lad=null;
+  if(needsLadder){
+    lad = el('div','fx-ladder');
+    lad.innerHTML='<div class="rail l"></div><div class="rail r"></div><div class="rungs"></div>';
+    lad.style.left = Math.max(8, Math.min(vw-100, rect.left + rect.width/2 - 46))+'px';
+    fx.appendChild(lad);
+    requestAnimationFrame(()=>{ lad.style.bottom='0'; });
+    setTimeout(()=>{ hero.classList.add('climb'); }, 300);
+  }
 
-  const fly=el('div','flying-photo'+(t.shape==='molde'?' molde':''));
-  fly.style.cssText += `left:${startRect.left}px;top:${startRect.top}px;width:${Math.max(60,startRect.width)}px;height:${Math.max(70,startRect.height)}px;`;
-  fly.innerHTML='<img alt="">'; fly.querySelector('img').src=t.image;
-  fx.appendChild(fly);
+  const tGrab = needsLadder ? 950 : 140;
 
-  const endX = vw*.5 - startRect.width*.5;
-  const endY = vh*.86;
-  const anim = fly.animate([
-    { transform:'translate(0,0) rotate(0deg) scale(1)' },
-    { transform:`translate(${(endX-startRect.left)*.55}px, ${(endY-startRect.top)*.28}px) rotate(200deg) scale(1.05)`, offset:.45 },
-    { transform:`translate(${endX-startRect.left}px, ${endY-startRect.top}px) rotate(430deg) scale(.92)` }
-  ], { duration:640, easing:'cubic-bezier(.3,.1,.7,1)', fill:'forwards' });
+  /* 2) objeto voa da prateleira para a mão do boneco */
+  setTimeout(()=>{
+    if(trEl) trEl.style.visibility='hidden';
 
-  anim.onfinish = ()=>{
-    fly.remove();
-    const vp=document.getElementById('viewport');
-    vp.classList.remove('shake'); void vp.offsetWidth; vp.classList.add('shake');
-    const cx = vw*.5, cy = vh*.88;
+    const fw=Math.max(60,rect.width), fh=Math.max(70,rect.height);
+    const gw=Math.min(fw,96), gh=Math.min(fh,106);     // tamanho "na mão"
+    const fly=el('div','flying-photo'+(t.shape==='molde'?' molde':''));
+    fly.style.cssText += `left:${rect.left}px;top:${rect.top}px;width:${fw}px;height:${fh}px;`;
+    fly.innerHTML='<img alt="">'; fly.querySelector('img').src=t.image;
+    fx.appendChild(fly);
 
-    for(let i=0;i<16;i++){
-      const sh=el('div','fx-shard');
-      const dist = 60 + Math.random()*180;
-      const dx = (Math.random()<.5?-1:1)*Math.random()*dist;
-      const dy = -Math.abs(Math.random()*dist);
-      sh.style.cssText += `left:${cx}px;top:${cy}px;`;
-      sh.animate([
-        { transform:'translate(0,0) rotate(0deg)', opacity:1 },
-        { transform:`translate(${dx}px, ${dy}px) rotate(${180+Math.random()*360}deg)`, opacity:1, offset:.55 },
-        { transform:`translate(${dx*1.15}px, ${dy*.2 + 120}px) rotate(${360+Math.random()*360}deg)`, opacity:0 }
-      ], { duration:750+Math.random()*250, easing:'cubic-bezier(.2,.6,.6,1)', fill:'forwards' })
-      .onfinish = ()=>sh.remove();
-      fx.appendChild(sh);
-    }
-    for(let i=0;i<9;i++){
-      const du=el('div','fx-dust');
-      const sz=30+Math.random()*60;
-      const dx=(Math.random()-.5)*260;
-      const dy=-(10+Math.random()*70);
-      du.style.cssText += `left:${cx-sz/2}px;top:${cy-sz/2}px;width:${sz}px;height:${sz}px;`;
-      du.animate([
-        { transform:'translate(0,10px) scale(.35)', opacity:.9 },
-        { transform:`translate(${dx*.6}px, ${dy*.6}px) scale(1.1)`, opacity:.55, offset:.5 },
-        { transform:`translate(${dx}px, ${dy}px) scale(1.9)`, opacity:0 }
-      ], { duration:900+Math.random()*400, easing:'ease-out', fill:'forwards' })
-      .onfinish = ()=>du.remove();
-      fx.appendChild(du);
-    }
-
-    const stamp=el('div','fx-stamp','CONCLUÍDO!');
-    stamp.style.cssText += `left:${cx}px;top:${vh*.64}px;`;
-    fx.appendChild(stamp);
-    setTimeout(()=>stamp.remove(), 1500);
-
-    t.broken = true;
-    save();
+    hero.classList.add('holding');
+    const hp=handPos();
     setTimeout(()=>{
-      S.throwing=false;
-      if(afterFn) afterFn();
-      buildScene(); renderHUD();
-      if(S.view==='menu') renderUI();
-    }, 350);
-  };
+      fly.style.transition='left .34s ease, top .34s ease, width .34s ease, height .34s ease';
+      fly.style.left=(hp.x-gw/2)+'px';
+      fly.style.top =(hp.y-gh)+'px';
+      fly.style.width=gw+'px';
+      fly.style.height=gh+'px';
+    }, 30);
+
+    /* 3) segurou! desce a escada (se subiu) com o objeto na mão */
+    setTimeout(()=>{
+      const finishThrow=()=>{
+        const hp2=handPos();
+        fly.style.transition='none';
+        fly.style.left=(hp2.x-gw/2)+'px';
+        fly.style.top =(hp2.y-gh)+'px';
+
+        hero.classList.remove('holding');
+        hero.classList.remove('throwing'); void hero.offsetWidth;
+        hero.classList.add('throwing');
+        setTimeout(()=>hero.classList.remove('throwing'), 650);
+
+        const startL=hp2.x-gw/2, startT=hp2.y-gh;
+        const endX=vw*.5-gw/2, endY=vh*.86;
+        const anim=fly.animate([
+          { transform:'translate(0,0) rotate(0deg) scale(1)' },
+          { transform:`translate(${(endX-startL)*.55}px, ${(endY-startT)*.30 - 110}px) rotate(210deg) scale(1.05)`, offset:.45 },
+          { transform:`translate(${endX-startL}px, ${endY-startT}px) rotate(430deg) scale(.92)` }
+        ], { duration:620, easing:'cubic-bezier(.3,.1,.7,1)', fill:'forwards' });
+        anim.onfinish=()=>{ fly.remove(); smashAt(t, lad); };
+      };
+
+      if(needsLadder){
+        hero.classList.remove('climb');                 // desce (transição .5s)
+        fly.style.transition='left 90ms linear, top 90ms linear';
+        const follow=setInterval(()=>{                  // objeto acompanha a mão
+          const p=handPos();
+          fly.style.left=(p.x-gw/2)+'px';
+          fly.style.top =(p.y-gh)+'px';
+        }, 40);
+        setTimeout(()=>{ clearInterval(follow); finishThrow(); }, 580);
+      } else {
+        setTimeout(finishThrow, 280);
+      }
+    }, 430);
+  }, tGrab);
+}
+
+/* impacto no chão: tremor + cacos de vidro + poeira + carimbo */
+function smashAt(t, lad){
+  const vw=innerWidth, vh=innerHeight;
+  const fx=document.getElementById('fx');
+  const vp=document.getElementById('viewport');
+  vp.classList.remove('shake'); void vp.offsetWidth; vp.classList.add('shake');
+  const cx = vw*.5, cy = vh*.88;
+
+  for(let i=0;i<16;i++){
+    const sh=el('div','fx-shard');
+    const dist = 60 + Math.random()*180;
+    const dx = (Math.random()<.5?-1:1)*Math.random()*dist;
+    const dy = -Math.abs(Math.random()*dist);
+    sh.style.cssText += `left:${cx}px;top:${cy}px;`;
+    sh.animate([
+      { transform:'translate(0,0) rotate(0deg)', opacity:1 },
+      { transform:`translate(${dx}px, ${dy}px) rotate(${180+Math.random()*360}deg)`, opacity:1, offset:.55 },
+      { transform:`translate(${dx*1.15}px, ${dy*.2 + 120}px) rotate(${360+Math.random()*360}deg)`, opacity:0 }
+    ], { duration:750+Math.random()*250, easing:'cubic-bezier(.2,.6,.6,1)', fill:'forwards' })
+    .onfinish = ()=>sh.remove();
+    fx.appendChild(sh);
+  }
+  for(let i=0;i<9;i++){
+    const du=el('div','fx-dust');
+    const sz=30+Math.random()*60;
+    const dx=(Math.random()-.5)*260;
+    const dy=-(10+Math.random()*70);
+    du.style.cssText += `left:${cx-sz/2}px;top:${cy-sz/2}px;width:${sz}px;height:${sz}px;`;
+    du.animate([
+      { transform:'translate(0,10px) scale(.35)', opacity:.9 },
+      { transform:`translate(${dx*.6}px, ${dy*.6}px) scale(1.1)`, opacity:.55, offset:.5 },
+      { transform:`translate(${dx}px, ${dy}px) scale(1.9)`, opacity:0 }
+    ], { duration:900+Math.random()*400, easing:'ease-out', fill:'forwards' })
+    .onfinish = ()=>du.remove();
+    fx.appendChild(du);
+  }
+
+  const stamp=el('div','fx-stamp','CONCLUÍDO!');
+  stamp.style.cssText += `left:${cx}px;top:${vh*.64}px;`;
+  fx.appendChild(stamp);
+  setTimeout(()=>stamp.remove(), 1500);
+
+  t.broken = true;
+  save();
+  setTimeout(()=>{
+    S.throwing=false;
+    if(lad){ lad.style.bottom='-64vh'; lad.style.opacity='0'; setTimeout(()=>lad.remove(), 800); }
+    buildScene(); renderHUD();
+    if(S.view==='menu') renderUI();
+  }, 350);
 }
 
 /* ================================================================
@@ -1283,7 +1318,7 @@ function renderMenu(){
           const part=Math.floor(rowIdx/3);
           const shelfMods=modCenters.filter(m=>m.shelfId===sh.id);
           const modU = shelfMods[part] || shelfMods[0];
-          tryThrow(t, modU?modU.u:undefined, rowIdx%3);
+          setTimeout(()=>tryThrow(t, modU?modU.u:undefined, rowIdx%3), 80);
         };
         card.appendChild(smash);
 
@@ -1380,7 +1415,7 @@ function renderUploader(){
   });
   fields.appendChild(sizes);
 
-  fields.appendChild(el('div',null,'<div style="font-family:\'Patrick Hand\',cursive;font-size:14px;color:var(--muted)">A foto aparece inteira dentro do objeto — nada é cortado.</div>'));
+  fields.appendChild(el('div',null,'<div style="font-family:\'Patrick Hand\',cursive;font-size:14px;color:var(--muted)">A foto preenche todo o objeto, em qualquer tamanho.</div>'));
 
   const actions=el('div','rowline'); actions.style.marginTop='6px';
   const ok=el('button','btn green','Colocar na prateleira');

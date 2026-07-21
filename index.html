@@ -38,6 +38,7 @@
   @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-7px,4px)}40%{transform:translate(6px,-3px)}60%{transform:translate(-4px,-4px)}80%{transform:translate(4px,3px)}}
   @keyframes crackpop{0%{transform:translate(-50%,-50%) rotate(-12deg) scale(.4);opacity:0}60%{transform:translate(-50%,-50%) rotate(-12deg) scale(1.25);opacity:1}100%{transform:translate(-50%,-50%) rotate(-12deg) scale(1);opacity:1}}
   @keyframes idlespin{0%{transform:rotateY(0deg)}100%{transform:rotateY(360deg)}}
+  @keyframes idlesway{0%,100%{transform:rotateY(-16deg)}50%{transform:rotateY(16deg)}}
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{animation:none !important;transition:none !important}
   }
@@ -50,7 +51,8 @@
     touch-action:none;cursor:grab;
   }
   #viewport.dragging{cursor:grabbing}
-  #viewport.shake{animation:shake .32s ease}
+  #shaker{position:absolute;inset:0;transform-style:preserve-3d}
+  #viewport.shake #shaker{animation:shake .32s ease}
   #world{
     position:absolute;left:50%;top:46%;width:0;height:0;
     transform-style:preserve-3d;will-change:transform;
@@ -108,12 +110,13 @@
     position:absolute;inset:0;transform-style:preserve-3d;
     animation:idlespin 9s linear infinite;
   }
+  .obj3d.wide .spin{animation:idlesway 6s ease-in-out infinite}
   .obj3d:hover .spin{animation-play-state:paused}
   .obj3d .f{
     position:absolute;inset:0;border:3px solid var(--ink);border-radius:6px;
     overflow:hidden;backface-visibility:hidden;background:#fff;
   }
-  .obj3d .f img{width:100%;height:100%;object-fit:cover;display:block}
+  .obj3d .f img{width:100%;height:100%;object-fit:contain;background:#fff;display:block}
   .obj3d .front{transform:translateZ(14px)}
   .obj3d .back{transform:rotateY(180deg) translateZ(14px)}
   .obj3d .edge{
@@ -144,7 +147,8 @@
   /* ============ objeto 3D: MOLDE (recorte extrudado) ============ */
   .obj3d.molde .layer{
     position:absolute;inset:0;
-    background-size:cover;background-position:center;
+    background-size:contain;background-position:center;background-repeat:no-repeat;
+    background-color:#efe8d6;
     border:2.5px solid var(--ink);
     border-radius:46% 54% 48% 52% / 62% 58% 40% 44%;
     backface-visibility:visible;
@@ -279,7 +283,7 @@
     position:fixed;left:14px;bottom:14px;z-index:40;
     left:max(14px, env(safe-area-inset-left));
     bottom:max(14px, env(safe-area-inset-bottom));
-    display:flex;gap:10px;
+    display:flex;flex-direction:column;gap:10px;
   }
   #hud-walk{
     position:fixed;right:14px;bottom:14px;z-index:40;
@@ -295,6 +299,7 @@
     user-select:none;-webkit-user-select:none;
   }
   .walkbtn:active,.walkbtn.hold{transform:translate(2px,2px);box-shadow:1px 1px 0 rgba(0,0,0,.5);background:var(--yellow)}
+  .walkbtn.zoom{width:56px;height:56px;font-size:22px}
   #hint-keys{
     position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:39;
     bottom:max(14px, env(safe-area-inset-bottom));
@@ -388,16 +393,16 @@
     width:150px;height:170px;border:3px solid var(--ink);border-radius:10px;overflow:hidden;
     background:#fff;box-shadow:4px 4px 0 rgba(0,0,0,.3);flex:none;
   }
-  .up-preview img{width:100%;height:100%;object-fit:cover}
+  .up-preview img{width:100%;height:100%;object-fit:contain}
   .up-fields{flex:1;min-width:230px;display:flex;flex-direction:column;gap:10px}
   .up-fields label{font-weight:800;font-size:13px}
   .up-fields input[type=text], .up-fields select{
     width:100%;border:2.5px solid var(--ink);border-radius:9px;padding:9px 11px;font-size:15px;
     font-weight:600;background:#fff;outline:none;min-height:42px;
   }
-  .shape-row{display:flex;gap:10px}
+  .shape-row{display:flex;gap:10px;flex-wrap:wrap}
   .shape-opt{
-    flex:1;border:3px solid var(--ink);border-radius:12px;background:#fff;cursor:pointer;
+    flex:1;min-width:96px;border:3px solid var(--ink);border-radius:12px;background:#fff;cursor:pointer;
     padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;
     font-weight:800;font-size:13px;box-shadow:3px 3px 0 rgba(0,0,0,.25);
   }
@@ -413,7 +418,7 @@
     box-shadow:6px 8px 0 rgba(0,0,0,.4);will-change:transform;
   }
   .flying-photo.molde{border-radius:46% 54% 48% 52% / 62% 58% 40% 44%}
-  .flying-photo img{width:100%;height:100%;object-fit:cover;display:block}
+  .flying-photo img{width:100%;height:100%;object-fit:contain;display:block}
   .fx-shard{
     position:fixed;width:22px;height:26px;will-change:transform,opacity;
     background:linear-gradient(135deg,rgba(220,242,252,.98),rgba(150,195,215,.85));
@@ -441,6 +446,7 @@
     .totalpill{display:none}
     #hint-keys{display:none}
     .walkbtn{width:60px;height:60px;font-size:23px}
+    .walkbtn.zoom{width:50px;height:50px;font-size:20px}
     #hero{width:112px;height:202px;bottom:2.6%}
     .meta-grid{grid-template-columns:repeat(auto-fill,minmax(135px,1fr))}
     .result-row .goto{flex:1 1 100%}
@@ -451,7 +457,7 @@
 <body>
 
 <div id="viewport">
-  <div id="world"></div>
+  <div id="shaker"><div id="world"></div></div>
 </div>
 <div id="vignette"></div>
 
@@ -495,8 +501,14 @@
 </div>
 
 <div id="hud-rot">
-  <button class="walkbtn" id="btnRotL" title="Girar para a esquerda">⟲</button>
-  <button class="walkbtn" id="btnRotR" title="Girar para a direita">⟳</button>
+  <div style="display:flex;gap:10px">
+    <button class="walkbtn" id="btnRotL" title="Girar para a esquerda">⟲</button>
+    <button class="walkbtn" id="btnRotR" title="Girar para a direita">⟳</button>
+  </div>
+  <div style="display:flex;gap:10px;justify-content:center">
+    <button class="walkbtn zoom" id="btnZoomOut" title="Afastar">−</button>
+    <button class="walkbtn zoom" id="btnZoomIn" title="Aproximar">+</button>
+  </div>
 </div>
 <div id="hud-walk">
   <div style="display:flex;justify-content:center">
@@ -508,7 +520,7 @@
     <button class="walkbtn" id="btnRight" title="Andar para a direita">▶</button>
   </div>
 </div>
-<div id="hint-keys"><b>W/S</b> anda · <b>Q/E</b> de lado · <b>A/D</b> gira (ou arraste) · <b>roda/pinça/2 toques</b> = zoom · clique no objeto: o boneco pega (escada se estiver no alto!) e joga no chão</div>
+<div id="hint-keys"><b>W/S</b> anda · <b>Q/E</b> de lado · <b>A/D</b> gira (ou arraste) · <b>+/−, roda, pinça</b> = zoom · clique no objeto: o boneco pega (escada se estiver no alto!) e joga no chão</div>
 
 <div id="toast"></div>
 <div id="fx"></div>
@@ -517,27 +529,27 @@
 <script>
 'use strict';
 /* ================================================================
-   ARQUIVO POW! — Sala de Metas 3D
-   Prateleiras por tema (sem limite) · objetos 3D "bloco" ou "molde"
-   Zoom (roda/pinça/2 toques) · escada p/ objetos no alto · poeira
+   ARQUIVO POW! — Sala de Metas 3D (versão consertada)
+   · clique confiável (zera dedos vazados da pinça)
+   · zoom máximo: anda até a parede + lente até 3x (botões +/−)
+   · tamanho do objeto: 1 espaço, 2 espaços ou prateleira toda
+   · foto inteira, sem corte · escada · poeira · sem popups nativos
    Dados: localStorage 'guardador.de.links.v1'
-   (campos shelves3d/trophies; o resto do JSON é preservado)
    ================================================================ */
 
 const KEY = 'guardador.de.links.v1';
 const FLOOR_Y = 210, CEIL_Y = -320;
 const PANEL_W = 340, PANEL_H = 440;
 const SHELF_GAP = 420;
-const PER_MOD = 9;
 const NEAR = 470;
 
 const S = {
   data: null,
   view: 'walk',                    // walk | menu | uploader
-  cx: 0, cz: 0, yaw: 0,
-  walkDir: 0, rotDir: 0, strafeDir: 0,
+  cx: 0, cz: 0, yaw: 0, zoom: 1,
+  walkDir: 0, rotDir: 0, strafeDir: 0, zoomDir: 0,
   throwing: false,
-  uploader: null                   // {image, shelfId, shape, name}
+  uploader: null
 };
 
 /* ---------- utilidades ---------- */
@@ -568,6 +580,7 @@ function migrate(d){
   d.trophies.forEach(t=>{
     if(!t.shelfId || !d.shelves3d.some(s=>s.id===t.shelfId)) t.shelfId=first;
     if(t.shape!=='molde') t.shape='bloco';
+    if(![1,2,3].includes(t.size)) t.size=1;
   });
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S.data)); }catch(e){} }
@@ -577,13 +590,27 @@ const brokenIn = sid => S.data.trophies.filter(t=> t.broken && t.shelfId===sid);
 const aliveAll = () => S.data.trophies.filter(t=>!t.broken);
 const brokenAll= () => S.data.trophies.filter(t=> t.broken);
 
-/* ---------- módulos: cada tema ocupa 1+ módulos de prateleira ---------- */
+/* ---------- empacota os objetos do tema em linhas de 3 espaços ----------
+   cada objeto ocupa t.size espaços (1, 2 ou 3); +1 espaço p/ o slot de foto */
+function packShelf(sid){
+  const rows=[];
+  let cur=[], used=0;
+  const put=item=>{
+    if(used + item.size > 3){ rows.push(cur); cur=[]; used=0; }
+    item.colStart=used;
+    cur.push(item); used+=item.size;
+  };
+  aliveIn(sid).forEach(t=>put({t, size:t.size||1}));
+  put({slot:true, size:1});
+  rows.push(cur);
+  return rows;
+}
 function moduleList(){
   const mods=[];
   S.data.shelves3d.forEach(sh=>{
-    const n = aliveIn(sh.id).length;
-    const count = Math.max(1, Math.ceil((n+1)/PER_MOD));
-    for(let k=0;k<count;k++) mods.push({shelf:sh, part:k, parts:count});
+    const rows = packShelf(sh.id);
+    const count = Math.max(1, Math.ceil(rows.length/3));
+    for(let k=0;k<count;k++) mods.push({shelf:sh, part:k, parts:count, rows});
   });
   return mods;
 }
@@ -608,7 +635,7 @@ function unitPlace(u, total){
    ================================================================ */
 const world = document.getElementById('world');
 const sceneEls = [];
-let modCenters = [];   // {u, cx, cz, shelfId}
+let modCenters = [];
 
 function face(cls, w, h, transform){
   const d = el('div','face '+cls);
@@ -658,34 +685,35 @@ function buildScene(){
       const b2=el('div','bracket'); b2.style.cssText+=`right:34px;top:${y+10}px;`; shelf.appendChild(b2);
     });
 
-    const aliveT = aliveIn(M.shelf.id);
-    const chunk = aliveT.slice(M.part*PER_MOD, M.part*PER_MOD+PER_MOD);
-    chunk.forEach((t,idx)=>{
-      const row=Math.floor(idx/3), col=idx%3;
-      const tr = buildObject3D(t);
-      tr.style.left = colsX[col]+'px';
-      tr.style.top = (rowsY[row]-100)+'px';
-      tr.dataset.row = row;
-      tr.dataset.mod = u;
-      tr.onclick = e => { e.stopPropagation(); if(dragMoved) return; tryThrow(t, u, row); };
-      shelf.appendChild(tr);
+    /* linhas deste módulo (empacotadas por tamanho) */
+    const modRows = M.rows.slice(M.part*3, M.part*3+3);
+    modRows.forEach((rowItems, r)=>{
+      rowItems.forEach(item=>{
+        const width = item.size===1?86 : item.size===2?196 : 306;
+        if(item.slot){
+          const slot=el('div','photo-slot','+ subir<br>foto');
+          slot.style.left = colsX[item.colStart]+'px';
+          slot.style.top = (rowsY[r]-100)+'px';
+          slot.onclick = e => { e.stopPropagation(); if(dragMoved) return; startUpload(M.shelf.id); };
+          shelf.appendChild(slot);
+        } else {
+          const t=item.t;
+          const tr = buildObject3D(t, width);
+          if(item.size>1) tr.classList.add('wide');
+          tr.style.left = colsX[item.colStart]+'px';
+          tr.style.top = (rowsY[r]-100)+'px';
+          tr.dataset.row = r;
+          tr.dataset.mod = u;
+          tr.onclick = e => { e.stopPropagation(); if(dragMoved) return; tryThrow(t, u, r); };
+          shelf.appendChild(tr);
+        }
+      });
     });
-
-    const nextIdx = aliveT.length - M.part*PER_MOD;
-    if(nextIdx >= 0 && nextIdx < PER_MOD){
-      const row=Math.floor(nextIdx/3), col=nextIdx%3;
-      const slot=el('div','photo-slot','+ subir<br>foto');
-      slot.style.left = colsX[col]+'px';
-      slot.style.top = (rowsY[row]-100)+'px';
-      slot.onclick = e => { e.stopPropagation(); if(dragMoved) return; startUpload(M.shelf.id); };
-      shelf.appendChild(slot);
-    }
 
     shelf.onclick = ()=>{ if(!dragMoved) openMenu(); };
     track(shelf, P.cx, P.cz);
     world.appendChild(shelf);
 
-    /* dica flutuante com o nome do tema */
     const tip=el('div','open-tip',title);
     tip.style.display='none';
     tip.dataset.tipFor = u;
@@ -696,7 +724,6 @@ function buildScene(){
     track(holder, P.cx, P.cz);
     world.appendChild(holder);
 
-    /* cacos deste tema, embaixo do primeiro módulo */
     if(M.part===0){
       brokenIn(M.shelf.id).forEach((t,i)=>{
         const pw=190, ph=110;
@@ -733,14 +760,15 @@ function buildScene(){
   updateWorld();
 }
 
-/* objeto 3D conforme o molde escolhido */
-function buildObject3D(t){
+/* objeto 3D conforme o molde escolhido; width = largura real na prateleira */
+function buildObject3D(t, width){
+  width = width || 86;
   const tr = el('div','obj3d'+(t.shape==='molde'?' molde':''));
+  tr.style.width = width+'px';
   tr.dataset.tid = t.id;
   tr.title = (t.name?t.name+' — ':'')+'jogar no chão (concluir!)';
   const spin = el('div','spin');
   if(t.shape==='molde'){
-    /* recorte extrudado: várias camadas da foto empilhadas em Z */
     const LAYERS=7, TH=22;
     for(let i=0;i<LAYERS;i++){
       const ly=el('div','layer');
@@ -756,6 +784,9 @@ function buildObject3D(t){
       '<div class="edge eL"></div><div class="edge eR"></div>'+
       '<div class="cap cT"></div><div class="cap cB"></div>';
     spin.querySelectorAll('img').forEach(im=>im.src=t.image);
+    /* laterais na largura real do objeto (1x, 2x ou prateleira toda) */
+    spin.querySelector('.eL').style.transform='rotateY(-90deg) translateZ('+(width/2)+'px)';
+    spin.querySelector('.eR').style.transform='rotateY(90deg) translateZ('+(width/2)+'px)';
   }
   spin.style.animationDelay = (-(Math.abs(hashCode(t.id))%12))+'s';
   tr.appendChild(el('div','sombra'));
@@ -819,8 +850,9 @@ function tick(t){
       S.cz += Math.sin(rad(S.yaw)) * v;
       moving=true;
     }
+    if(S.zoomDir!==0){ zoomBy(S.zoomDir * .55 * dt); }
   }
-  const lim = roomSide()/2 - 185;
+  const lim = roomSide()/2 - 95;
   S.cx = Math.max(-lim, Math.min(lim, S.cx));
   S.cz = Math.max(-lim, Math.min(lim, S.cz));
   updateWorld();
@@ -829,10 +861,30 @@ function tick(t){
 }
 requestAnimationFrame(tick);
 
-/* zoom: avança/recua na direção do olhar */
-function dolly(amount){
-  S.cx += Math.sin(rad(S.yaw)) * amount;
-  S.cz += -Math.cos(rad(S.yaw)) * amount;
+/* zoom híbrido: avança na direção do olhar; ao encostar na parede,
+   vira zoom de lente (amplia a imagem até 3x). Recuar desfaz a lente antes. */
+function zoomBy(amount){
+  if(amount<0 && S.zoom>1){
+    S.zoom = Math.max(1, S.zoom + amount*0.004);
+    applyZoom(); return;
+  }
+  const lim = roomSide()/2 - 95;
+  const nx = S.cx + Math.sin(rad(S.yaw)) * amount;
+  const nz = S.cz + (-Math.cos(rad(S.yaw))) * amount;
+  const cx = Math.max(-lim, Math.min(lim, nx));
+  const cz = Math.max(-lim, Math.min(lim, nz));
+  const moved = Math.hypot(cx-S.cx, cz-S.cz);
+  S.cx=cx; S.cz=cz;
+  if(amount>0 && moved < Math.abs(amount)*0.45){
+    S.zoom = Math.min(3, S.zoom + amount*0.004);
+    applyZoom();
+  }
+}
+const dolly = zoomBy;
+function applyZoom(){
+  const vp=document.getElementById('viewport');
+  vp.style.transformOrigin='50% 46%';
+  vp.style.transform = S.zoom>1.001 ? 'scale('+S.zoom.toFixed(3)+')' : '';
 }
 
 /* teclado */
@@ -869,6 +921,8 @@ holdBtn(document.getElementById('btnLeft'), ()=>{ if(S.strafeDir===-1) S.strafeD
 holdBtn(document.getElementById('btnRight'),()=>{ if(S.strafeDir===1) S.strafeDir=0; }, ()=>S.strafeDir=1);
 holdBtn(document.getElementById('btnRotL'), ()=>{ if(S.rotDir===-1) S.rotDir=0; }, ()=>S.rotDir=-1);
 holdBtn(document.getElementById('btnRotR'), ()=>{ if(S.rotDir===1) S.rotDir=0; }, ()=>S.rotDir=1);
+holdBtn(document.getElementById('btnZoomIn'),  ()=>{ if(S.zoomDir===1) S.zoomDir=0; }, ()=>S.zoomDir=1);
+holdBtn(document.getElementById('btnZoomOut'), ()=>{ if(S.zoomDir===-1) S.zoomDir=0; }, ()=>S.zoomDir=-1);
 
 /* arrastar p/ girar · pinça p/ zoom · toque duplo p/ aproximar */
 let dragMoved=false;
@@ -879,6 +933,10 @@ let dragMoved=false;
 
   vp.addEventListener('pointerdown', e=>{
     if(S.view!=='walk') return;
+    /* dedo primário novo = gesto novo: limpa ponteiros que vazaram
+       (navegadores engolem o pointerup de um dedo da pinça às vezes,
+        e aí todo toque virava "pinça" e nenhum clique passava) */
+    if(e.isPrimary) pts.clear();
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
     if(pts.size===1){
       lastX=e.clientX; startX=e.clientX; startY=e.clientY;
@@ -894,7 +952,6 @@ let dragMoved=false;
     pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
     if(pts.size===1){
       const dx=e.clientX-lastX; lastX=e.clientX;
-      /* toque tem tremida natural: só vira arrasto depois de 9px acumulados */
       if(Math.abs(e.clientX-startX)+Math.abs(e.clientY-startY) > 9) dragMoved=true;
       if(dragMoved && dx!==0) S.yaw += dx*0.22;
     } else if(pts.size===2){
@@ -914,15 +971,14 @@ let dragMoved=false;
   };
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
+  window.addEventListener('blur', ()=>{ pts.clear(); vp.classList.remove('dragging'); dragMoved=false; });
 
-  /* roda do mouse = zoom */
   vp.addEventListener('wheel', e=>{
     if(S.view!=='walk') return;
     e.preventDefault();
     dolly(-e.deltaY*0.7);
   }, {passive:false});
 
-  /* toque/clique duplo = passo à frente */
   vp.addEventListener('pointerup', e=>{
     if(S.view!=='walk' || dragMoved) return;
     const now=Date.now();
@@ -932,7 +988,7 @@ let dragMoved=false;
 })();
 
 /* ================================================================
-   UPLOAD (escolha do molde e da prateleira)
+   UPLOAD
    ================================================================ */
 function startUpload(shelfId){
   S._uploadShelf = shelfId || (S.data.shelves3d[0]&&S.data.shelves3d[0].id);
@@ -942,7 +998,7 @@ document.getElementById('trophyFile').onchange = e=>{
   const file=e.target.files && e.target.files[0]; if(!file) return;
   const r=new FileReader();
   r.onload=()=>{
-    S.uploader = { image:r.result, shelfId:S._uploadShelf||S.data.shelves3d[0].id, shape:'bloco', name:'' };
+    S.uploader = { image:r.result, shelfId:S._uploadShelf||S.data.shelves3d[0].id, shape:'bloco', size:1, name:'' };
     S.view='uploader';
     renderUI();
   };
@@ -974,7 +1030,7 @@ function askYes(msg, onYes){
   const veil=el('div','overlay-veil'); veil.style.zIndex='90';
   const panel=el('div','panel'); panel.style.width='min(420px,94vw)';
   const body=el('div','panel-body');
-  body.appendChild(el('div',null,'<div class="hand" style="font-family:\'Patrick Hand\',cursive;font-size:20px;margin-bottom:14px">'+esc(msg)+'</div>'));
+  body.appendChild(el('div',null,'<div style="font-family:\'Patrick Hand\',cursive;font-size:20px;margin-bottom:14px">'+esc(msg)+'</div>'));
   const row=el('div','rowline');
   const ok=el('button','btn danger','Sim, pode!');
   ok.onclick=()=>{ veil.remove(); onYes(); };
@@ -1012,14 +1068,12 @@ function askText(title, placeholder, onOk){
 
 function tryThrow(t, modU, row){
   if(S.throwing) return;
-  /* alcance: precisa estar perto do módulo */
   const m = modCenters.find(x=>x.u===modU);
   if(m){
     const d=Math.hypot(m.cx-S.cx, m.cz-S.cz);
     if(d>NEAR){ toast('Chegue mais perto da prateleira!'); return; }
   }
-  /* sem popup: clicou, o boneco pega e joga na hora */
-  const needsLadder = row!==undefined && row<2;   // andar de cima e do meio
+  const needsLadder = row!==undefined && row<2;
   if(needsLadder) ladderThen(t);
   else throwCore(t);
 }
@@ -1038,7 +1092,7 @@ function ladderThen(t){
 
   setTimeout(()=>{ hero.classList.add('climb'); }, 320);
   setTimeout(()=>{
-    S.throwing=false;              /* throwCore reassume o controle */
+    S.throwing=false;
     throwCore(t, ()=>{
       hero.classList.remove('climb');
       setTimeout(()=>{ lad.style.bottom='-64vh'; lad.style.opacity='0'; }, 380);
@@ -1082,7 +1136,6 @@ function throwCore(t, afterFn){
     vp.classList.remove('shake'); void vp.offsetWidth; vp.classList.add('shake');
     const cx = vw*.5, cy = vh*.88;
 
-    /* cacos de vidro */
     for(let i=0;i<16;i++){
       const sh=el('div','fx-shard');
       const dist = 60 + Math.random()*180;
@@ -1097,7 +1150,6 @@ function throwCore(t, afterFn){
       .onfinish = ()=>sh.remove();
       fx.appendChild(sh);
     }
-    /* poeira */
     for(let i=0;i<9;i++){
       const du=el('div','fx-dust');
       const sz=30+Math.random()*60;
@@ -1163,7 +1215,7 @@ function panelShell(title){
   return {veil, body};
 }
 
-/* ---------- MENU (todas as prateleiras) ---------- */
+/* ---------- MENU ---------- */
 function renderMenu(){
   const {veil, body}=panelShell('Minhas Metas');
 
@@ -1203,7 +1255,7 @@ function renderMenu(){
       alive.forEach(t=>{
         const card=el('div','meta-card');
 
-        card.appendChild(el('div','shapechip', t.shape==='molde'?'MOLDE':'BLOCO'));
+        card.appendChild(el('div','shapechip', (t.shape==='molde'?'MOLDE':'BLOCO')+(t.size>1?' · '+t.size+'x':'')));
 
         const del2=el('button','xbtn','×'); del2.title='Excluir meta';
         del2.onclick=e=>{ e.stopPropagation(); askYes('Excluir esta meta?', ()=>{ S.data.trophies=S.data.trophies.filter(x=>x.id!==t.id); save(); buildScene(); renderHUD(); renderUI(); }); };
@@ -1225,9 +1277,13 @@ function renderMenu(){
         smash.onclick=e=>{
           e.stopPropagation();
           closeAll();
-          const idx=aliveIn(sh.id).findIndex(x=>x.id===t.id);
-          const modU = modCenters.find(m=>m.shelfId===sh.id);
-          tryThrow(t, modU?modU.u:undefined, Math.floor((idx%PER_MOD)/3));
+          const rows=packShelf(sh.id);
+          let rowIdx=0;
+          rows.forEach((r,i)=>r.forEach(it=>{ if(it.t && it.t.id===t.id) rowIdx=i; }));
+          const part=Math.floor(rowIdx/3);
+          const shelfMods=modCenters.filter(m=>m.shelfId===sh.id);
+          const modU = shelfMods[part] || shelfMods[0];
+          tryThrow(t, modU?modU.u:undefined, rowIdx%3);
         };
         card.appendChild(smash);
 
@@ -1312,10 +1368,24 @@ function renderUploader(){
   shapes.appendChild(optB); shapes.appendChild(optM);
   fields.appendChild(shapes);
 
+  fields.appendChild(el('label',null,'Tamanho na prateleira'));
+  const sizes=el('div','shape-row');
+  [[1,'1 espaço'],[2,'2 espaços'],[3,'prateleira toda']].forEach(pair=>{
+    const sz=pair[0], lb=pair[1];
+    const o=el('button','shape-opt'+(up.size===sz?' sel':''));
+    const w = sz===1?18 : sz===2?36 : 54;
+    o.innerHTML='<div class="ico bloco" style="width:'+w+'px;height:30px"></div>'+lb;
+    o.onclick=()=>{ up.size=sz; renderUI(); };
+    sizes.appendChild(o);
+  });
+  fields.appendChild(sizes);
+
+  fields.appendChild(el('div',null,'<div style="font-family:\'Patrick Hand\',cursive;font-size:14px;color:var(--muted)">A foto aparece inteira dentro do objeto — nada é cortado.</div>'));
+
   const actions=el('div','rowline'); actions.style.marginTop='6px';
   const ok=el('button','btn green','Colocar na prateleira');
   ok.onclick=()=>{
-    S.data.trophies.push({ id:uid(), name:up.name.trim(), image:up.image, broken:false, shape:up.shape, shelfId:up.shelfId });
+    S.data.trophies.push({ id:uid(), name:up.name.trim(), image:up.image, broken:false, shape:up.shape, size:up.size, shelfId:up.shelfId });
     save();
     closeAll();
     buildScene(); renderHUD();
@@ -1347,7 +1417,8 @@ document.getElementById('importFile').onchange = e=>{
       if(d && typeof d==='object'){
         migrate(d);
         S.data=d; save();
-        Object.assign(S,{view:'walk',cx:0,cz:0,yaw:0,uploader:null});
+        Object.assign(S,{view:'walk',cx:0,cz:0,yaw:0,zoom:1,uploader:null});
+        applyZoom();
         S.cz = roomSide()/2 - 460;
         buildScene(); renderHUD(); renderUI();
       } else toast('Arquivo inválido.');
@@ -1357,7 +1428,7 @@ document.getElementById('importFile').onchange = e=>{
 };
 
 /* ---------- HUD ligações ---------- */
-document.getElementById('btnLogo').onclick=()=>{ Object.assign(S,{cx:0,yaw:0}); S.cz=roomSide()/2-460; closeAll(); };
+document.getElementById('btnLogo').onclick=()=>{ Object.assign(S,{cx:0,yaw:0,zoom:1}); applyZoom(); S.cz=roomSide()/2-460; closeAll(); };
 document.getElementById('btnMenu').onclick=openMenu;
 document.getElementById('btnAddShelf').onclick=()=>addShelfAsk();
 document.getElementById('btnAddPhoto').onclick=()=>startUpload(null);

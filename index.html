@@ -101,7 +101,7 @@
     overflow:hidden;text-overflow:ellipsis;
   }
 
-  /* ============ objeto 3D: BLOCO ============ */
+  /* ============ objeto 3D: BLOCO (formato segue a foto) ============ */
   .obj3d{
     position:absolute;width:86px;height:96px;cursor:pointer;
     transform-style:preserve-3d;
@@ -116,8 +116,8 @@
     position:absolute;inset:0;border:3px solid var(--ink);border-radius:6px;
     overflow:hidden;backface-visibility:hidden;background:#fff;
   }
-  /* FOTO INTEIRA AJUSTADA DENTRO DO OBJETO — NADA É CORTADO */
-  .obj3d .f img{width:100%;height:100%;object-fit:contain;background:#fff;display:block}
+  /* o bloco tem a MESMA proporção da foto -> preenche perfeito, sem corte e sem borda */
+  .obj3d .f img{width:100%;height:100%;object-fit:cover;background:#fff;display:block}
   .obj3d .front{transform:translateZ(14px)}
   .obj3d .back{transform:rotateY(180deg) translateZ(14px)}
   .obj3d .edge{
@@ -125,15 +125,11 @@
     background:linear-gradient(90deg,#efe8d6,#d9d0b8 50%,#bdb298);
     border:3px solid var(--ink);
   }
-  .obj3d .eL{transform:rotateY(-90deg) translateZ(43px)}
-  .obj3d .eR{transform:rotateY(90deg) translateZ(43px)}
   .obj3d .cap{
     position:absolute;left:0;right:0;height:28px;top:50%;margin-top:-14px;
     background:linear-gradient(180deg,#f6f1e2,#cfc6ae);
     border:3px solid var(--ink);
   }
-  .obj3d .cT{transform:rotateX(90deg) translateZ(48px)}
-  .obj3d .cB{transform:rotateX(-90deg) translateZ(48px)}
   .obj3d .sombra{
     position:absolute;left:-8px;right:-8px;bottom:-14px;height:16px;
     background:radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,.5), transparent 70%);
@@ -143,7 +139,7 @@
   /* ============ objeto 3D: MOLDE (recorte extrudado) ============ */
   .obj3d.molde .layer{
     position:absolute;inset:0;
-    background-size:contain;background-position:center;background-repeat:no-repeat;
+    background-size:cover;background-position:center;background-repeat:no-repeat;
     background-color:#efe8d6;
     border:2.5px solid var(--ink);
     border-radius:46% 54% 48% 52% / 62% 58% 40% 44%;
@@ -210,7 +206,6 @@
   #hero .armL,#hero .armR{transform-origin:50% 8%}
   #hero.walking .armL{animation:armL .46s ease-in-out infinite}
   #hero.walking .armR{animation:armR .46s ease-in-out infinite}
-  /* braços erguidos segurando o objeto */
   #hero.holding .armR{animation:none;transform:rotate(-135deg);transition:transform .25s ease}
   #hero.holding .armL{animation:none;transform:rotate(135deg);transition:transform .25s ease}
   #hero.throwing .armR{animation:throwArmR .6s ease}
@@ -417,7 +412,7 @@
     box-shadow:6px 8px 0 rgba(0,0,0,.4);will-change:transform;z-index:56;
   }
   .flying-photo.molde{border-radius:46% 54% 48% 52% / 62% 58% 40% 44%}
-  .flying-photo img{width:100%;height:100%;object-fit:contain;display:block}
+  .flying-photo img{width:100%;height:100%;object-fit:cover;display:block}
   .fx-shard{
     position:fixed;width:22px;height:26px;will-change:transform,opacity;
     background:linear-gradient(135deg,rgba(220,242,252,.98),rgba(150,195,215,.85));
@@ -529,10 +524,10 @@
 'use strict';
 /* ================================================================
    ARQUIVO POW! — Sala de Metas 3D
-   · TOQUE PRÓPRIO: detecta o toque pela posição na tela, sem
-     depender do clique nativo em elemento 3D (que falha no celular)
-   · clique no objeto: escada -> pega na mão -> quebra c/ vidro+poeira
-   · FOTO INTEIRA ajustada dentro do objeto (contain, sem cortes)
+   · O BLOCO 3D SE MOLDA À PROPORÇÃO DA FOTO: sem corte, sem borda
+     branca — encaixe perfeito em 1x, 2x ou prateleira toda
+   · toque próprio (sempre funciona) · escada · pega na mão ·
+     quebra com vidro + poeira
    Dados: localStorage 'guardador.de.links.v1'
    ================================================================ */
 
@@ -541,6 +536,7 @@ const FLOOR_Y = 210, CEIL_Y = -320;
 const PANEL_W = 340, PANEL_H = 440;
 const SHELF_GAP = 420;
 const NEAR = 470;
+const OBJ_MAXH = 118, OBJ_MINH = 52;   // limites de altura do objeto na prateleira
 
 const S = {
   data: null,
@@ -583,6 +579,22 @@ function migrate(d){
   });
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S.data)); }catch(e){} }
+
+/* mede a proporção das fotos antigas (subidas antes desta versão) */
+function fixMissingAr(){
+  if(S._arBusy) return;
+  const need = S.data.trophies.filter(t=>t.image && !(t.ar>0));
+  if(!need.length) return;
+  S._arBusy = true;
+  let left = need.length, changed = false;
+  need.forEach(t=>{
+    const im = new Image();
+    const done = ()=>{ if(--left===0){ S._arBusy=false; if(changed){ save(); buildScene(); } } };
+    im.onload = ()=>{ t.ar = im.naturalHeight>0 ? im.naturalWidth/im.naturalHeight : 86/96; changed=true; done(); };
+    im.onerror = ()=>{ t.ar = 86/96; changed=true; done(); };
+    im.src = t.image;
+  });
+}
 
 const aliveIn  = sid => S.data.trophies.filter(t=>!t.broken && t.shelfId===sid);
 const brokenIn = sid => S.data.trophies.filter(t=> t.broken && t.shelfId===sid);
@@ -691,17 +703,18 @@ function buildScene(){
           const slot=el('div','photo-slot','+ subir<br>foto');
           slot.style.left = colsX[item.colStart]+'px';
           slot.style.top = (rowsY[r]-100)+'px';
-          slot._tap = ()=>startUpload(M.shelf.id);      /* toque próprio */
+          slot._tap = ()=>startUpload(M.shelf.id);
           shelf.appendChild(slot);
         } else {
           const t=item.t;
           const tr = buildObject3D(t, width);
           if(item.size>1) tr.classList.add('wide');
-          tr.style.left = colsX[item.colStart]+'px';
-          tr.style.top = (rowsY[r]-100)+'px';
+          /* centraliza no espaço e apoia na prateleira */
+          tr.style.left = (colsX[item.colStart] + (width - tr._w)/2)+'px';
+          tr.style.top  = (rowsY[r] - tr._h - 4)+'px';
           tr.dataset.row = r;
           tr.dataset.mod = u;
-          tr._tap = ()=>tryThrow(t, u, r);              /* toque próprio */
+          tr._tap = ()=>tryThrow(t, u, r);
           shelf.appendChild(tr);
         }
       });
@@ -756,11 +769,24 @@ function buildScene(){
   updateWorld();
 }
 
-/* objeto 3D conforme o molde escolhido; width = largura real na prateleira */
-function buildObject3D(t, width){
-  width = width || 86;
+/* dimensões do objeto: MESMA proporção da foto, dentro dos limites */
+function objSize(t, maxW){
+  const ar = (t.ar>0) ? t.ar : (86/96);
+  let h = OBJ_MAXH, w = h*ar;
+  if(w > maxW){ w = maxW; h = w/ar; }
+  if(h < OBJ_MINH){ h = OBJ_MINH; w = Math.min(maxW, h*ar); }
+  return { w: Math.round(w), h: Math.round(h) };
+}
+
+/* objeto 3D — o bloco nasce no formato da foto */
+function buildObject3D(t, maxW){
+  maxW = maxW || 86;
+  const dim = objSize(t, maxW);
+  const w = dim.w, h = dim.h;
   const tr = el('div','obj3d'+(t.shape==='molde'?' molde':''));
-  tr.style.width = width+'px';
+  tr.style.width = w+'px';
+  tr.style.height = h+'px';
+  tr._w = w; tr._h = h;
   tr.dataset.tid = t.id;
   tr.title = (t.name?t.name+' — ':'')+'jogar no chão (concluir!)';
   const spin = el('div','spin');
@@ -780,8 +806,11 @@ function buildObject3D(t, width){
       '<div class="edge eL"></div><div class="edge eR"></div>'+
       '<div class="cap cT"></div><div class="cap cB"></div>';
     spin.querySelectorAll('img').forEach(im=>im.src=t.image);
-    spin.querySelector('.eL').style.transform='rotateY(-90deg) translateZ('+(width/2)+'px)';
-    spin.querySelector('.eR').style.transform='rotateY(90deg) translateZ('+(width/2)+'px)';
+    /* laterais e tampas na medida exata do bloco */
+    spin.querySelector('.eL').style.transform='rotateY(-90deg) translateZ('+(w/2)+'px)';
+    spin.querySelector('.eR').style.transform='rotateY(90deg) translateZ('+(w/2)+'px)';
+    spin.querySelector('.cT').style.transform='rotateX(90deg) translateZ('+(h/2)+'px)';
+    spin.querySelector('.cB').style.transform='rotateX(-90deg) translateZ('+(h/2)+'px)';
   }
   spin.style.animationDelay = (-(Math.abs(hashCode(t.id))%12))+'s';
   tr.appendChild(el('div','sombra'));
@@ -798,7 +827,7 @@ function mulberry(seedStr){
    TOQUE PRÓPRIO — detecta o que foi tocado pela posição na tela
    ================================================================ */
 function tapPick(x, y){
-  const PAD = 14;                                   // tolerância do dedo
+  const PAD = 14;
   const cands=[];
   document.querySelectorAll('.obj3d, .photo-slot, .pile-face').forEach(n=>{
     if(!n._tap) return;
@@ -811,11 +840,10 @@ function tapPick(x, y){
     }
   });
   if(cands.length){
-    cands.sort((a,b)=> (a.area-b.area) || (a.dc-b.dc));  // menor alvo vence
+    cands.sort((a,b)=> (a.area-b.area) || (a.dc-b.dc));
     cands[0].n._tap();
     return true;
   }
-  /* tocou no fundo de uma prateleira -> abre o menu */
   const shelves=document.querySelectorAll('.shelf-face');
   for(const n of shelves){
     if(getComputedStyle(n).visibility==='hidden') continue;
@@ -1000,8 +1028,6 @@ let dragMoved=false;
     dolly(-e.deltaY*0.7);
   }, {passive:false});
 
-  /* TOQUE: primeiro tenta interagir com o que está sob o dedo;
-     se não tiver nada, toque duplo aproxima */
   vp.addEventListener('pointerup', e=>{
     if(S.view!=='walk' || dragMoved || S.throwing) return;
     if(tapPick(e.clientX, e.clientY)){ lastTap=0; return; }
@@ -1012,7 +1038,7 @@ let dragMoved=false;
 })();
 
 /* ================================================================
-   UPLOAD
+   UPLOAD (já mede a proporção da foto)
    ================================================================ */
 function startUpload(shelfId){
   S._uploadShelf = shelfId || (S.data.shelves3d[0]&&S.data.shelves3d[0].id);
@@ -1022,9 +1048,16 @@ document.getElementById('trophyFile').onchange = e=>{
   const file=e.target.files && e.target.files[0]; if(!file) return;
   const r=new FileReader();
   r.onload=()=>{
-    S.uploader = { image:r.result, shelfId:S._uploadShelf||S.data.shelves3d[0].id, shape:'bloco', size:1, name:'' };
-    S.view='uploader';
-    renderUI();
+    const src=r.result;
+    const im=new Image();
+    const go=ar=>{
+      S.uploader = { image:src, shelfId:S._uploadShelf||S.data.shelves3d[0].id, shape:'bloco', size:1, name:'', ar:ar };
+      S.view='uploader';
+      renderUI();
+    };
+    im.onload=()=>go(im.naturalHeight>0 ? im.naturalWidth/im.naturalHeight : 86/96);
+    im.onerror=()=>go(86/96);
+    im.src=src;
   };
   r.readAsDataURL(file);
   e.target.value='';
@@ -1095,18 +1128,15 @@ function tryThrow(t, modU, row){
     const d=Math.hypot(m.cx-S.cx, m.cz-S.cz);
     if(d>NEAR){ toast('Chegue mais perto da prateleira!'); return; }
   }
-  const needsLadder = row!==undefined && row<2;   // prateleiras de cima e do meio
+  const needsLadder = row!==undefined && row<2;
   grabAndSmash(t, needsLadder);
 }
 
-/* posição da mão do boneco na tela */
 function handPos(){
   const r=hero.getBoundingClientRect();
   return { x:r.left + r.width*0.62, y:r.top + r.height*0.30 };
 }
 
-/* sequência: (escada) -> voa da prateleira p/ a MÃO -> segura ->
-   desce -> arremesso -> QUEBRA com vidro + poeira + carimbo */
 function grabAndSmash(t, needsLadder){
   if(S.throwing) return;
   S.throwing = true;
@@ -1119,7 +1149,6 @@ function grabAndSmash(t, needsLadder){
   let rect = trEl ? trEl.getBoundingClientRect() : null;
   if(!rect || rect.width<4) rect = { left:vw*.6, top:vh*.3, width:90, height:100 };
 
-  /* 1) escada (se o objeto estiver no alto) */
   let lad=null;
   if(needsLadder){
     lad = el('div','fx-ladder');
@@ -1132,12 +1161,13 @@ function grabAndSmash(t, needsLadder){
 
   const tGrab = needsLadder ? 950 : 140;
 
-  /* 2) objeto voa da prateleira para a mão do boneco */
   setTimeout(()=>{
     if(trEl) trEl.style.visibility='hidden';
 
-    const fw=Math.max(60,rect.width), fh=Math.max(70,rect.height);
-    const gw=Math.min(fw,96), gh=Math.min(fh,106);     // tamanho "na mão"
+    const fw=Math.max(50,rect.width), fh=Math.max(50,rect.height);
+    /* na mão: encolhe MANTENDO a proporção da foto */
+    const sc=Math.min(1, 96/fw, 106/fh);
+    const gw=Math.round(fw*sc), gh=Math.round(fh*sc);
     const fly=el('div','flying-photo'+(t.shape==='molde'?' molde':''));
     fly.style.cssText += `left:${rect.left}px;top:${rect.top}px;width:${fw}px;height:${fh}px;`;
     fly.innerHTML='<img alt="">'; fly.querySelector('img').src=t.image;
@@ -1153,7 +1183,6 @@ function grabAndSmash(t, needsLadder){
       fly.style.height=gh+'px';
     }, 30);
 
-    /* 3) segurou! desce a escada (se subiu) com o objeto na mão */
     setTimeout(()=>{
       const finishThrow=()=>{
         const hp2=handPos();
@@ -1177,9 +1206,9 @@ function grabAndSmash(t, needsLadder){
       };
 
       if(needsLadder){
-        hero.classList.remove('climb');                 // desce
+        hero.classList.remove('climb');
         fly.style.transition='left 90ms linear, top 90ms linear';
-        const follow=setInterval(()=>{                  // objeto acompanha a mão
+        const follow=setInterval(()=>{
           const p=handPos();
           fly.style.left=(p.x-gw/2)+'px';
           fly.style.top =(p.y-gh)+'px';
@@ -1192,7 +1221,6 @@ function grabAndSmash(t, needsLadder){
   }, tGrab);
 }
 
-/* impacto no chão: tremor + cacos de vidro + poeira + carimbo */
 function smashAt(t, lad){
   const vw=innerWidth, vh=innerHeight;
   const fx=document.getElementById('fx');
@@ -1443,12 +1471,12 @@ function renderUploader(){
   });
   fields.appendChild(sizes);
 
-  fields.appendChild(el('div',null,'<div style="font-family:\'Patrick Hand\',cursive;font-size:14px;color:var(--muted)">A foto aparece inteira dentro do objeto — nada é cortado.</div>'));
+  fields.appendChild(el('div',null,'<div style="font-family:\'Patrick Hand\',cursive;font-size:14px;color:var(--muted)">O objeto 3D nasce no formato da sua foto — encaixe perfeito, sem corte e sem borda.</div>'));
 
   const actions=el('div','rowline'); actions.style.marginTop='6px';
   const ok=el('button','btn green','Colocar na prateleira');
   ok.onclick=()=>{
-    S.data.trophies.push({ id:uid(), name:up.name.trim(), image:up.image, broken:false, shape:up.shape, size:up.size, shelfId:up.shelfId });
+    S.data.trophies.push({ id:uid(), name:up.name.trim(), image:up.image, broken:false, shape:up.shape, size:up.size, shelfId:up.shelfId, ar:up.ar });
     save();
     closeAll();
     buildScene(); renderHUD();
@@ -1484,6 +1512,7 @@ document.getElementById('importFile').onchange = e=>{
         applyZoom();
         S.cz = roomSide()/2 - 460;
         buildScene(); renderHUD(); renderUI();
+        fixMissingAr();
       } else toast('Arquivo inválido.');
     }catch(err){ toast('Não foi possível ler o JSON.'); }
   };
@@ -1505,6 +1534,7 @@ S.cz = roomSide()/2 - 460;
 buildScene();
 renderHUD();
 renderUI();
+fixMissingAr();
 </script>
 </body>
 </html>

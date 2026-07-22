@@ -116,8 +116,8 @@
     position:absolute;inset:0;border:3px solid var(--ink);border-radius:6px;
     overflow:hidden;backface-visibility:hidden;background:#fff;
   }
-  /* FOTO PREENCHE TODO O ESPAÇO */
-  .obj3d .f img{width:100%;height:100%;object-fit:cover;background:#fff;display:block}
+  /* FOTO INTEIRA AJUSTADA DENTRO DO OBJETO — NADA É CORTADO */
+  .obj3d .f img{width:100%;height:100%;object-fit:contain;background:#fff;display:block}
   .obj3d .front{transform:translateZ(14px)}
   .obj3d .back{transform:rotateY(180deg) translateZ(14px)}
   .obj3d .edge{
@@ -143,7 +143,7 @@
   /* ============ objeto 3D: MOLDE (recorte extrudado) ============ */
   .obj3d.molde .layer{
     position:absolute;inset:0;
-    background-size:cover;background-position:center;background-repeat:no-repeat;
+    background-size:contain;background-position:center;background-repeat:no-repeat;
     background-color:#efe8d6;
     border:2.5px solid var(--ink);
     border-radius:46% 54% 48% 52% / 62% 58% 40% 44%;
@@ -392,7 +392,7 @@
     width:150px;height:170px;border:3px solid var(--ink);border-radius:10px;overflow:hidden;
     background:#fff;box-shadow:4px 4px 0 rgba(0,0,0,.3);flex:none;
   }
-  .up-preview img{width:100%;height:100%;object-fit:cover}
+  .up-preview img{width:100%;height:100%;object-fit:contain}
   .up-fields{flex:1;min-width:230px;display:flex;flex-direction:column;gap:10px}
   .up-fields label{font-weight:800;font-size:13px}
   .up-fields input[type=text], .up-fields select{
@@ -417,7 +417,7 @@
     box-shadow:6px 8px 0 rgba(0,0,0,.4);will-change:transform;z-index:56;
   }
   .flying-photo.molde{border-radius:46% 54% 48% 52% / 62% 58% 40% 44%}
-  .flying-photo img{width:100%;height:100%;object-fit:cover;display:block}
+  .flying-photo img{width:100%;height:100%;object-fit:contain;display:block}
   .fx-shard{
     position:fixed;width:22px;height:26px;will-change:transform,opacity;
     background:linear-gradient(135deg,rgba(220,242,252,.98),rgba(150,195,215,.85));
@@ -529,11 +529,10 @@
 'use strict';
 /* ================================================================
    ARQUIVO POW! — Sala de Metas 3D
-   · TOQUE PRÓPRIO: o app detecta o toque pela posição na tela
-     (getBoundingClientRect), sem depender do clique nativo em
-     elemento 3D — que falha no celular. Agora SEMPRE funciona.
+   · TOQUE PRÓPRIO: detecta o toque pela posição na tela, sem
+     depender do clique nativo em elemento 3D (que falha no celular)
    · clique no objeto: escada -> pega na mão -> quebra c/ vidro+poeira
-   · foto preenche todo o objeto (cover)
+   · FOTO INTEIRA ajustada dentro do objeto (contain, sem cortes)
    Dados: localStorage 'guardador.de.links.v1'
    ================================================================ */
 
@@ -796,8 +795,7 @@ function mulberry(seedStr){
 }
 
 /* ================================================================
-   TOQUE PRÓPRIO — detecta o que foi tocado pela posição na tela,
-   sem depender do clique nativo em elementos 3D (que falha)
+   TOQUE PRÓPRIO — detecta o que foi tocado pela posição na tela
    ================================================================ */
 function tapPick(x, y){
   const PAD = 14;                                   // tolerância do dedo
@@ -1445,7 +1443,7 @@ function renderUploader(){
   });
   fields.appendChild(sizes);
 
-  fields.appendChild(el('div',null,'<div style="font-family:\'Patrick Hand\',cursive;font-size:14px;color:var(--muted)">A foto preenche todo o objeto, em qualquer tamanho.</div>'));
+  fields.appendChild(el('div',null,'<div style="font-family:\'Patrick Hand\',cursive;font-size:14px;color:var(--muted)">A foto aparece inteira dentro do objeto — nada é cortado.</div>'));
 
   const actions=el('div','rowline'); actions.style.marginTop='6px';
   const ok=el('button','btn green','Colocar na prateleira');
